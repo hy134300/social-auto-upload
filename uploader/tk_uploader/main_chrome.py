@@ -254,19 +254,37 @@ class TiktokVideo(object):
         await page.locator('#creator-tools-selection-menu-header >> text=English (US)').click()
 
     async def click_publish(self, page):
-        success_flag_div = 'div.common-modal-confirm-modal'
         while True:
             try:
-                publish_button = self.locator_base.locator('div.button-group button').nth(0)
-                if await publish_button.count():
-                    await publish_button.click()
+                # 1️⃣ 点击主 Post 按钮
+                publish_button = self.locator_base.locator(
+                    'div.button-group > button:has-text("Post")'
+                )
+                await publish_button.click()
 
-                await page.wait_for_url("https://www.tiktok.com/tiktokstudio/content",  timeout=3000)
+                # 2️⃣ 等待“Continue to post?” 弹窗（短等待）
+                try:
+                    confirm_btn = page.locator(
+                        'button:has-text("Post now")'
+                    )
+                    await confirm_btn.wait_for(timeout=2000)
+                    tiktok_logger.info("  [-] found confirm dialog, clicking Post now")
+                    await confirm_btn.click()
+                except:
+                    # 没弹窗是正常情况
+                    pass
+
+                # 3️⃣ 等待发布成功跳转
+                await page.wait_for_url(
+                    "https://www.tiktok.com/tiktokstudio/content",
+                    timeout=8000
+                )
+
                 tiktok_logger.success("  [-] video published success")
                 break
+
             except Exception as e:
-                tiktok_logger.exception(f"  [-] Exception: {e}")
-                tiktok_logger.info("  [-] video publishing")
+                tiktok_logger.info("  [-] video publishing...")
                 await asyncio.sleep(0.5)
 
     async def get_last_video_id(self, page):

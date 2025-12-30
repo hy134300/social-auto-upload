@@ -7,11 +7,15 @@ import uuid
 from pathlib import Path
 from queue import Queue
 from flask_cors import CORS
+
+from examples.upload_video_to_tiktok import post_video_tiktok
+from examples.upload_video_to_youtobe import post_video_youtobe
 from myUtils.auth import check_cookie
 from flask import Flask, request, jsonify, Response, render_template, send_from_directory
 from conf import BASE_DIR
-from myUtils.login import get_tencent_cookie, douyin_cookie_gen, get_ks_cookie, xiaohongshu_cookie_gen
+from myUtils.login import get_tencent_cookie, douyin_cookie_gen, get_ks_cookie, xiaohongshu_cookie_gen, get_titok_cookie
 from myUtils.postVideo import post_video_tencent, post_video_DouYin, post_video_ks, post_video_xhs
+from uploader.tk_uploader.main import tiktok_setup
 
 active_queues = {}
 app = Flask(__name__)
@@ -419,6 +423,29 @@ def postVideo():
         case 4:
             post_video_ks(title, file_list, tags, account_list, category, enableTimer, videos_per_day, daily_times,
                       start_days)
+        case 5:
+            post_video_tiktok(
+                file_list=file_list,
+                account_file=account_list[0],  # TikTok 一般单账号
+                title=title,
+                tags=tags,
+                enableTimer=enableTimer,
+                videos_per_day=videos_per_day,
+                daily_times=daily_times,
+                start_days=start_days,
+                thumbnail_path=thumbnail_path
+            )
+        case 6:
+            asyncio.run(post_video_youtobe(
+                file_list=file_list,
+                title=title,
+                tags=tags,
+                enableTimer=enableTimer,
+                videos_per_day=videos_per_day,
+                daily_times=daily_times,
+                start_days=start_days,
+                thumbnail_path=thumbnail_path
+            ))
     # 返回响应给客户端
     return jsonify(
         {
@@ -655,6 +682,12 @@ def run_async_function(type,id,status_queue):
             asyncio.set_event_loop(loop)
             loop.run_until_complete(get_ks_cookie(id,status_queue))
             loop.close()
+        case '5':
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(get_titok_cookie(id, status_queue))
+            loop.close()
+
 
 # SSE 流生成器函数
 def sse_stream(status_queue):

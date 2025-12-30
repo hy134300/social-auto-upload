@@ -227,6 +227,81 @@ async def get_ks_cookie(id,status_queue):
             print("✅ 用户状态已记录")
         status_queue.put("200")
 
+
+async def get_titok_cookie(id,status_queue):
+    url_changed_event = asyncio.Event()
+    async def on_url_change():
+        # 检查是否是主框架的变化
+        if page.url != original_url:
+            url_changed_event.set()
+    async with async_playwright() as playwright:
+        options = {
+            'args': [
+                '--lang en-GB'
+            ],
+            'headless': LOCAL_CHROME_HEADLESS,  # Set headless option here
+        }
+        # Make sure to run headed.
+        browser = await playwright.chromium.launch(**options)
+        # Setup context however you like.
+        context = await browser.new_context()  # Pass any options
+        context = await set_init_script(context)
+        # Pause the page, and start recording manually.
+        page = await context.new_page()
+        await page.goto("https://www.tiktok.com/tiktokstudio/upload?lang=en")
+
+        # 定位并点击“立即登录”按钮（类型为 link）
+        await page.get_by_text("使用二维码").click()
+        img_locator = page.get_by_role("img", name="qrcode")
+        # 获取 src 属性值
+        src = await img_locator.get_attribute("src")
+        original_url = page.url
+        print("✅ 图片地址:", src)
+        status_queue.put(src)
+        # 监听页面的 'framenavigated' 事件，只关注主框架的变化
+        page.on('framenavigated',
+                lambda frame: asyncio.create_task(on_url_change()) if frame == page.main_frame else None)
+
+        try:
+            # 等待 URL 变化或超时
+            await asyncio.wait_for(url_changed_event.wait(), timeout=200)  # 最多等待 200 秒
+            print("监听页面跳转成功")
+        except asyncio.TimeoutError:
+            status_queue.put("500")
+            print("监听页面跳转超时")
+            await page.close()
+            await context.close()
+            await browser.close()
+            return None
+        uuid_v1 = uuid.uuid1()
+        print(f"UUID v1: {uuid_v1}")
+        # 确保cookiesFile目录存在
+        cookies_dir = Path(BASE_DIR / "cookiesFile")
+        cookies_dir.mkdir(exist_ok=True)
+        await context.storage_state(path=cookies_dir / f"{uuid_v1}.json")
+        result = await check_cookie(5, f"{uuid_v1}.json")
+        if not result:
+            status_queue.put("500")
+            await page.close()
+            await context.close()
+            await browser.close()
+            return None
+        await page.close()
+        await context.close()
+        await browser.close()
+
+        with sqlite3.connect(Path(BASE_DIR / "db" / "database.db")) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                                        INSERT INTO user_info (type, filePath, userName, status)
+                                        VALUES (?, ?, ?, ?)
+                                        ''', (5, f"{uuid_v1}.json", id, 1))
+            conn.commit()
+            print("✅ 用户状态已记录")
+        status_queue.put("200")
+
+
+
 # 小红书登录
 async def xiaohongshu_cookie_gen(id,status_queue):
     url_changed_event = asyncio.Event()

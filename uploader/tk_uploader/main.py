@@ -9,12 +9,12 @@ from uploader.tk_uploader.tk_config import Tk_Locator
 from utils.base_social_media import set_init_script
 from utils.files_times import get_absolute_path
 from utils.log import tiktok_logger
-from conf import LOCAL_CHROME_HEADLESS
+from conf import LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH
 
 
 async def cookie_auth(account_file):
     async with async_playwright() as playwright:
-        browser = await playwright.firefox.launch(headless=LOCAL_CHROME_HEADLESS)
+        browser = await playwright.chromium.launch(headless=LOCAL_CHROME_HEADLESS, executable_path=LOCAL_CHROME_PATH)
         context = await browser.new_context(storage_state=account_file)
         context = await set_init_script(context)
         # 创建一个新的页面
@@ -57,7 +57,8 @@ async def get_tiktok_cookie(account_file):
             'headless': LOCAL_CHROME_HEADLESS,  # Set headless option here
         }
         # Make sure to run headed.
-        browser = await playwright.firefox.launch(**options)
+        # browser = await playwright.firefox.launch(**options)
+        browser = await playwright.chromium.launch(headless=LOCAL_CHROME_HEADLESS, executable_path=LOCAL_CHROME_PATH)
         # Setup context however you like.
         context = await browser.new_context()  # Pass any options
         context = await set_init_script(context)

@@ -2,15 +2,15 @@ import asyncio
 from pathlib import Path
 from venv import logger
 
+from playwright.async_api import async_playwright
+
 from conf import BASE_DIR
-# from tk_uploader.main import tiktok_setup, TiktokVideo
 from uploader.tk_uploader.main_chrome import tiktok_setup, TiktokVideo
+from uploader.youtube_uploader.youtube_uploader import YouTubeVideoUploader
 from utils.files_times import generate_schedule_time_next_day, get_title_and_hashtags
 
-
-def post_video_tiktok(
+async def post_video_youtobe(
     file_list,
-    account_file,
     title=None,
     tags=None,
     enableTimer=False,
@@ -19,13 +19,6 @@ def post_video_tiktok(
     start_days=1,
     thumbnail_path=None
 ):
-    account_file = Path(BASE_DIR) / "cookiesFile" / account_file
-    # 1️⃣ cookie 检查
-    cookie_ok =  tiktok_setup(account_file, handle=True)
-    if not cookie_ok:
-        raise Exception("TikTok cookie setup failed")
-
-    # 2️⃣ 视频文件
     base_dir = Path(BASE_DIR)
     video_dir = base_dir / "videoFile" / "tmp"
 
@@ -54,16 +47,7 @@ def post_video_tiktok(
             raise FileNotFoundError(f"视频文件不存在：{p}")
 
         normalized_files.append(p)
-
     files = normalized_files
-
-    file_num = len(files)
-
-    # 3️⃣ 定时发布
-    if enableTimer:
-        publish_datetimes = generate_schedule_time_next_day(file_num, videos_per_day, daily_times, start_days)
-    else:
-        publish_datetimes = 0
 
     # 4️⃣ 逐个上传（可以后面改成并发）
     for index, file in enumerate(files):
@@ -73,21 +57,16 @@ def post_video_tiktok(
         # 如果没传标题，走自动生成
         if not title or not tags:
             video_title, video_tags = get_title_and_hashtags(str(file))
-
-        thumb = Path(thumbnail_path) if thumbnail_path else file.with_suffix('.png')
-        thumb = thumb if thumb.exists() else None
-
-        app = TiktokVideo(
+        app = YouTubeVideoUploader(
             video_title,
-            file,
             video_tags,
-            publish_datetimes,
-            account_file,
-            thumb
+            file,
+            '',
+            True
         )
-
         try:
-            asyncio.run(app.main(), debug=False)
+            async with async_playwright() as playwright:
+                 await app.test_open_upload_only(playwright)
         except Exception as e:
             # 单视频失败不影响后续
             logger.exception(f"TikTok upload failed: {file} -> {e}")

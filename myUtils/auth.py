@@ -1,11 +1,13 @@
 import asyncio
 import configparser
 import os
+from venv import logger
 
 from playwright.async_api import async_playwright
 from xhs import XhsClient
 
 from conf import BASE_DIR, LOCAL_CHROME_HEADLESS
+from uploader.tk_uploader.main import tiktok_setup
 from utils.base_social_media import set_init_script
 from utils.log import tencent_logger, kuaishou_logger, douyin_logger
 from pathlib import Path
@@ -103,21 +105,29 @@ async def cookie_auth_xhs(account_file):
 
 
 async def check_cookie(type, file_path):
-    match type:
-        # 小红书
-        case 1:
-            return await cookie_auth_xhs(Path(BASE_DIR / "cookiesFile" / file_path))
-        # 视频号
-        case 2:
-            return await cookie_auth_tencent(Path(BASE_DIR / "cookiesFile" / file_path))
-        # 抖音
-        case 3:
-            return await cookie_auth_douyin(Path(BASE_DIR / "cookiesFile" / file_path))
-        # 快手
-        case 4:
-            return await cookie_auth_ks(Path(BASE_DIR / "cookiesFile" / file_path))
-        case _:
-            return False
+    try:
+        cookie_path = Path(BASE_DIR / "cookiesFile" / file_path)
+
+        match type:
+            case 1:
+                return await cookie_auth_xhs(cookie_path)
+            case 2:
+                return await cookie_auth_tencent(cookie_path)
+            case 3:
+                return await cookie_auth_douyin(cookie_path)
+            case 4:
+                return await cookie_auth_ks(cookie_path)
+            case 5:
+                return await tiktok_setup(cookie_path)
+            case _:
+                return False
+
+    except Exception as e:
+        logger.exception(
+            f"[!] check_cookie failed, type={type}, file={file_path}: {e}"
+        )
+        return False
+
 
 # a = asyncio.run(check_cookie(1,"3a6cfdc0-3d51-11f0-8507-44e51723d63c.json"))
 # print(a)
